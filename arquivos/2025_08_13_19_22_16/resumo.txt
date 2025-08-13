@@ -1,0 +1,9 @@
+Resumo reunião:
+O projeto MIT-GPT de transcrição de reuniões visa desenvolver um web app em Python para registro e análise de informações em reuniões corporativas, utilizando a API da OpenAI e o modelo de linguagem GPT. A aplicação terá funcionalidades como captura de áudio, conversão em texto e resumos precisos, revisão de conteúdos discutidos e criação de assistentes virtuais.
+
+Acordos da Reunião:
+- Desenvolver web app em Python
+- Utilizar a API da OpenAI e o modelo de linguagem GPT
+- Incluir funcionalidades de captura de áudio, conversão em texto e resumos precisos
+- Criar assistentes virtuais e sistemas de apoio a deficientes auditivos
+- Utilizar o framework Streamlit para criar uma interface de usuário amigável

@@ -1,0 +1,16 @@
+
+No projeto MIT-GPT transcrição de reuniões tive a oportunidade de falar com o professor
+oportunidade de desenvolver um web app em Python para registro e análise de informação
+ações e reuniões corporativas. Aprendi a capturar áudios e reuniões corporativas.
+reuniões em tempo real, convertendo-os em textos e resumos precisos.
+Uma ferramenta valiosa para assegurar que todos os detalhes e decisões importantes sejam documentados.
+Essa aplicação, que eu construí, não só facilita a receitação de dados, mas também facilita a distribuição de dados.
+revisão de conteúdos discutidos, mas também serve como base para a criação de assistentes virtuais.
+sistemas de apoio a deficientes auditivos
+e outras inovações que utilizam o processamento de linguagem natural.
+Aprofundei bastante os meus conhecimentos na utilização da API.
+da OpenAI, explorei as funcionalidades do modelo de linguagem GPT para realizar
+poder dar transcrições e gerar resumos inteligentes. Também aprimorei...
+minhas habilidades no Python, principalmente para interação com APIs, processamento de fluxos de áudio.
+implementação de lógica de negócios essenciais para o funcionamento de um web app. Esse projeto também incluiu
+o aprendizado do framework Streamlit, que eu utilizei para criar uma interface de usuário amigável, permitindo a captura de áudio via microfone e a apresentação de vídeos.
