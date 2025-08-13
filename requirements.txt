@@ -4,3 +4,5 @@ python-dotenv
 streamlit
 streamlit_webrtc
 pydub
+
+#ffmpeg.exe is required for audio processing
