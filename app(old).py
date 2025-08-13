@@ -5,35 +5,51 @@ import queue
 
 from streamlit_webrtc import WebRtcMode, webrtc_streamer
 import streamlit as st
+
 import pydub
 import openai
 from dotenv import load_dotenv, find_dotenv
 
-from locales import LANG
-
 PASTA_ARQUIVOS = Path(__file__).parent / 'arquivos'
 PASTA_ARQUIVOS.mkdir(exist_ok=True)
 
+PROMPT = '''
+Faça o reumo do texto delimitado por #### 
+O texto é a transcrição de uma reunião.
+O resumo deve contar com os principais assuntos abordados.
+O resumo deve ter no máximo 300 caracteres.
+O resumo deve estar em texto corrido.
+No final, devem ser apresentados todos acordos e combinados 
+feitos na reunião no formato de bullet points.
+
+O formato final que eu desejo é:
+
+Resumo reunião:
+- escrever aqui o resumo.
+
+Acordos da Reunião:
+- acrodo 1
+- acordo 2
+- acordo 3
+- acordo n
+
+texto: ####{}####
+'''
+
+
 _ = load_dotenv(find_dotenv())
 
-# ===== Utils de Arquivo =====
+
 def salva_arquivo(caminho_arquivo, conteudo):
-    # Garantir UTF-8 ao escrever
-    with open(caminho_arquivo, 'w', encoding='utf-8') as f:
+    with open(caminho_arquivo, 'w') as f:
         f.write(conteudo)
 
 def le_arquivo(caminho_arquivo):
-    # Leitura robusta com fallback de encoding
-    if not caminho_arquivo.exists():
+    if caminho_arquivo.exists():
+        with open(caminho_arquivo) as f:
+            return f.read()
+    else:
         return ''
-    data = caminho_arquivo.read_bytes()
-    for enc in ('utf-8', 'cp1252', 'latin-1'):
-        try:
-            return data.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    # Último recurso: substituir caracteres inválidos
-    return data.decode('utf-8', errors='replace')
 
 def listar_reunioes():
     lista_reunioes = PASTA_ARQUIVOS.glob('*')
@@ -41,39 +57,41 @@ def listar_reunioes():
     lista_reunioes.sort(reverse=True)
     reunioes_dict = {}
     for pasta_reuniao in lista_reunioes:
-        if not pasta_reuniao.is_dir():
-            continue
         data_reuniao = pasta_reuniao.stem
-        try:
-            ano, mes, dia, hora, min, seg = data_reuniao.split('_')
-            reunioes_dict[data_reuniao] = f'{ano}/{mes}/{dia} {hora}:{min}:{seg}'
-        except Exception:
-            reunioes_dict[data_reuniao] = data_reuniao
+        ano, mes, dia, hora, min, seg = data_reuniao.split('_')
+        reunioes_dict[data_reuniao] = f'{ano}/{mes}/{dia} {hora}:{min}:{seg}'
         titulo = le_arquivo(pasta_reuniao / 'titulo.txt')
         if titulo != '':
             reunioes_dict[data_reuniao] += f' - {titulo}'
     return reunioes_dict
 
-# ===== OpenAI =====
+
+# OPENAI UTILS =====================
 client = openai.OpenAI()
 
-def transcreve_audio(caminho_audio, language=None, response_format='text'):
+def transcreve_audio(caminho_audio, language='pt', response_format='text'):
     with open(caminho_audio, 'rb') as arquivo_audio:
-        kwargs = dict(model='whisper-1', response_format=response_format, file=arquivo_audio)
-        if language:
-            kwargs['language'] = language
-        transcricao = client.audio.transcriptions.create(**kwargs)
+        transcricao = client.audio.transcriptions.create(
+            model='whisper-1',
+            language=language,
+            response_format=response_format,
+            file=arquivo_audio,
+        )
     return transcricao
 
-def chat_openai(mensagem, modelo='gpt-3.5-turbo-1106'):
+def chat_openai(
+        mensagem,
+        modelo='gpt-3.5-turbo-1106',
+    ):
     mensagens = [{'role': 'user', 'content': mensagem}]
     resposta = client.chat.completions.create(
         model=modelo,
         messages=mensagens,
-    )
+        )
     return resposta.choices[0].message.content
 
-# ===== Gravação =====
+# TAB GRAVA REUNIÃO =====================
+
 def adiciona_chunck_audio(frames_de_audio, audio_chunck):
     for frame in frames_de_audio:
         sound = pydub.AudioSegment(
@@ -85,19 +103,19 @@ def adiciona_chunck_audio(frames_de_audio, audio_chunck):
         audio_chunck += sound
     return audio_chunck
 
-def tab_grava_reuniao(L):
+def tab_grava_reuniao():
     webrtx_ctx = webrtc_streamer(
         key='recebe_audio',
         mode=WebRtcMode.SENDONLY,
         audio_receiver_size=1024,
         media_stream_constraints={'video': False, 'audio': True},
     )
+
     if not webrtx_ctx.state.playing:
         return
 
     container = st.empty()
-    container.markdown(L['start_talking'])
-
+    container.markdown('Comece a falar')
     pasta_reuniao = PASTA_ARQUIVOS / datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     pasta_reuniao.mkdir()
 
@@ -113,42 +131,38 @@ def tab_grava_reuniao(L):
             except queue.Empty:
                 time.sleep(0.1)
                 continue
-
             audio_completo = adiciona_chunck_audio(frames_de_audio, audio_completo)
             audio_chunck = adiciona_chunck_audio(frames_de_audio, audio_chunck)
-
             if len(audio_chunck) > 0:
                 audio_completo.export(pasta_reuniao / 'audio.mp3')
                 agora = time.time()
                 if agora - ultima_trancricao > 5:
                     ultima_trancricao = agora
                     audio_chunck.export(pasta_reuniao / 'audio_temp.mp3')
-                    transcricao_chunck = transcreve_audio(
-                        pasta_reuniao / 'audio_temp.mp3',
-                        language=st.session_state.get('trans_lang', None)
-                    )
+                    transcricao_chunck = transcreve_audio(pasta_reuniao / 'audio_temp.mp3')
                     transcricao += transcricao_chunck
                     salva_arquivo(pasta_reuniao / 'transcricao.txt', transcricao)
                     container.markdown(transcricao)
                     audio_chunck = pydub.AudioSegment.empty()
-            else:
-                break
         else:
             break
 
-# ===== Seleção/Revisão =====
-def tab_selecao_reuniao(L):
+
+# TAB SELEÇÃO REUNIÃO =====================
+def tab_selecao_reuniao():
     reunioes_dict = listar_reunioes()
     if len(reunioes_dict) > 0:
-        reuniao_selecionada = st.selectbox(L['select_meeting'], list(reunioes_dict.values()))
+        reuniao_selecionada = st.selectbox('Selecione uma reunião',
+                                        list(reunioes_dict.values()))
         st.divider()
         reuniao_data = [k for k, v in reunioes_dict.items() if v == reuniao_selecionada][0]
         pasta_reuniao = PASTA_ARQUIVOS / reuniao_data
-
         if not (pasta_reuniao / 'titulo.txt').exists():
-            st.warning(L['add_title'])
-            titulo_reuniao = st.text_input(L['meeting_title'])
-            st.button(L['save'], on_click=salvar_titulo, args=(pasta_reuniao, titulo_reuniao))
+            st.warning('Adicione um titulo')
+            titulo_reuniao = st.text_input('Título da reunião')
+            st.button('Salvar',
+                      on_click=salvar_titulo,
+                      args=(pasta_reuniao, titulo_reuniao))
         else:
             titulo = le_arquivo(pasta_reuniao / 'titulo.txt')
             transcricao = le_arquivo(pasta_reuniao / 'transcricao.txt')
@@ -156,65 +170,27 @@ def tab_selecao_reuniao(L):
             if resumo == '':
                 gerar_resumo(pasta_reuniao)
                 resumo = le_arquivo(pasta_reuniao / 'resumo.txt')
-
             st.markdown(f'## {titulo}')
-            st.markdown(f"**{L['summary_label']}**")
             st.markdown(f'{resumo}')
-            st.markdown(f"**{L['transcription_label']}**")
-            st.markdown(f'{transcricao}')
-    else:
-        st.info("Grave uma reunião na primeira aba para visualizar aqui.")
-
+            st.markdown(f'Transcricao: {transcricao}')
+        
 def salvar_titulo(pasta_reuniao, titulo):
     salva_arquivo(pasta_reuniao / 'titulo.txt', titulo)
 
 def gerar_resumo(pasta_reuniao):
     transcricao = le_arquivo(pasta_reuniao / 'transcricao.txt')
-    prompt_template = LANG[st.session_state.get("sum_lang", "pt")]["prompt"]
-    resumo = chat_openai(mensagem=prompt_template.format(transcricao))
+    resumo = chat_openai(mensagem=PROMPT.format(transcricao))
     salva_arquivo(pasta_reuniao / 'resumo.txt', resumo)
 
-# ===== MAIN =====
+
+# MAIN =====================
 def main():
-    # Estado inicial
-    if "lang_code" not in st.session_state:
-        st.session_state.lang_code = "pt"
-    if "trans_lang" not in st.session_state:
-        st.session_state.trans_lang = None  # None => Whisper auto
-    if "sum_lang" not in st.session_state:
-        st.session_state.sum_lang = "pt"
-
-    # Sidebar: seletores de idioma
-    lang_display = st.sidebar.selectbox(
-        "Language / Idioma",
-        ["Português", "English"],
-        index=0 if st.session_state.lang_code == "pt" else 1,
-    )
-    st.session_state.lang_code = "pt" if lang_display == "Português" else "en"
-    L = LANG[st.session_state.lang_code]["ui"]
-
-    trans_opt = st.sidebar.selectbox(
-        L["transcription_language"],
-        [L["auto"], "Português (pt)", "English (en)"],
-        index=0 if st.session_state.trans_lang is None else (1 if st.session_state.trans_lang == "pt" else 2),
-    )
-    st.session_state.trans_lang = None if trans_opt.startswith(L["auto"]) else ("pt" if "pt" in trans_opt else "en")
-
-    sum_opt = st.sidebar.selectbox(
-        L["summary_language"],
-        ["Português", "English"],
-        index=0 if st.session_state.sum_lang == "pt" else 1,
-    )
-    st.session_state.sum_lang = "pt" if sum_opt.startswith("Portugu") else "en"
-
-    # UI principal
-    st.header(L['app_title'], divider=True)
-    tab_gravar, tab_selecao = st.tabs([L['tab_record'], L['tab_saved']])
-
+    st.header('Bem-vindo ao MeetGPT 🎙️', divider=True)
+    tab_gravar, tab_selecao = st.tabs(['Gravar Reunião', 'Ver transcrições salvas'])
     with tab_gravar:
-        tab_grava_reuniao(L)
+        tab_grava_reuniao()
     with tab_selecao:
-        tab_selecao_reuniao(L)
+        tab_selecao_reuniao()
 
 if __name__ == '__main__':
     main()

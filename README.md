@@ -1,4 +1,5 @@
 # MeetGPT – Transcrição de Reuniões 🎙️
+[English version](README.en.md)
 
 Aplicação Web em Python para capturar áudio de reuniões em tempo real, transcrever com Whisper e gerar resumos inteligentes com GPT. Ideal para registrar decisões, facilitar revisões e servir como base para assistentes virtuais e soluções de acessibilidade.
 
