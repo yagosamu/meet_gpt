@@ -35,7 +35,7 @@ Ao final, você terá um projeto robusto que integra captura de áudio, processa
 
 ---
 
-## Funcionalidades 🚀
+## Funcionalidades 
 - Gravação de áudio direto do navegador (microfone).
 - Transcrição incremental a cada ~5 segundos.
 - Geração automática de resumo com:
@@ -82,7 +82,7 @@ arquivos/
 
 ---
 
-## Tecnologias 🛠️
+## Tecnologias 
 - Python
 - Streamlit
 - streamlit-webrtc (WebRTC no navegador)
@@ -104,7 +104,7 @@ Instalação do FFmpeg:
 
 ---
 
-## Instalação 📦
+## Instalação 
 1. Clone o repositório:
    ```
    git clone https://github.com/<owner>/<repo>.git
